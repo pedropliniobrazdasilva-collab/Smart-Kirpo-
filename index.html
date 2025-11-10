@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Smart Kirpo</title>
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#FF7A00">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Poppins', 'sans-serif'],
+            },
+            colors: {
+              brand: {
+                orange: '#FF7A00',
+                light: '#FF9933',
+                dark: '#CC6200',
+              },
+              dark: {
+                bg: '#000000',
+                surface: '#1A1A1A',
+                primary: '#BB86FC',
+                secondary: '#03DAC6',
+              }
+            },
+            animation: {
+              'fade-in': 'fadeIn 0.5s ease-in-out',
+              'slide-in-up': 'slideInUp 0.5s ease-in-out',
+              'typewriter': 'typewriter 2s steps(40, end), blink-caret .75s step-end 5',
+              'twinkle': 'twinkle 5s ease-in-out infinite alternate',
+            },
+            keyframes: {
+              fadeIn: {
+                '0%': { opacity: 0 },
+                '100%': { opacity: 1 },
+              },
+              slideInUp: {
+                '0%': { transform: 'translateY(20px)', opacity: 0 },
+                '100%': { transform: 'translateY(0)', opacity: 1 },
+              },
+              typewriter: {
+                from: { width: '0' },
+                to: { width: '100%' }
+              },
+              'blink-caret': {
+                'from, to': { borderColor: 'transparent' },
+                '50%': { borderColor: '#FF7A00' },
+              },
+              twinkle: {
+                  '0%, 100%': { opacity: 0.2 },
+                  '50%': { opacity: 1 },
+              },
+            }
+          },
+        },
+      }
+    </script>
+  <script type="importmap">
+{
+  "imports": {
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.29.0",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/"
+  }
+}
+</script>
+</head>
+  <body class="bg-black font-sans">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').then(registration => {
+            console.log('ServiceWorker registration successful with scope: ', registration.scope);
+          }, err => {
+            console.log('ServiceWorker registration failed: ', err);
+          });
+        });
+      }
+    </script>
+  </body>
+</html>

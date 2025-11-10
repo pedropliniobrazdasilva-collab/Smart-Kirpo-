@@ -1,0 +1,5 @@
+{
+  "name": " Smart Kirpo",
+  "description": "Um PWA de rotina diária para criar, gerenciar e acompanhar tarefas com um painel de produtividade e frases motivacionais. Funciona offline e possui temas claro e escuro.",
+  "requestFramePermissions": []
+}
