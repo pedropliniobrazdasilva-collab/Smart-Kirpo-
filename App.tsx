@@ -74,7 +74,7 @@ const App: React.FC = () => {
     }
     localStorage.setItem('theme', theme);
   }, [theme]);
-  
+
   // Notification scheduler effect
   useEffect(() => {
     if (notificationPermission !== 'granted') return;
@@ -177,17 +177,34 @@ const App: React.FC = () => {
     }
   };
 
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(err => {
+        // Optional: Show a user-friendly message
+        console.error(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
+      });
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      }
+    }
+  };
+  
+  const handleStart = () => {
+    toggleFullscreen();
+    setScreen('tasks');
+  }
 
   const renderScreen = () => {
     switch (screen) {
       case 'home':
-        return <HomeScreen onStart={() => setScreen('tasks')} />;
+        return <HomeScreen onStart={handleStart} />;
       case 'tasks':
         return <TaskListScreen tasksHook={tasksHook} />;
       case 'dashboard':
         return <DashboardScreen tasks={tasksHook.tasks} />;
       default:
-        return <HomeScreen onStart={() => setScreen('tasks')} />;
+        return <HomeScreen onStart={handleStart} />;
     }
   };
   
