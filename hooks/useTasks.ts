@@ -76,5 +76,5 @@ export const useTasks = () => {
     );
   }, []);
 
-  return { tasks, addTask, updateTask, deleteTask, toggleTaskCompletion };
+  return { tasks, setTasks, addTask, updateTask, deleteTask, toggleTaskCompletion };
 };

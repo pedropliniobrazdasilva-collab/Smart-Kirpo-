@@ -1,4 +1,3 @@
-
 const CACHE_NAME = 'smart-kirpo-cache-v1';
 const URLS_TO_CACHE = [
   '/',

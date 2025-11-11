@@ -77,7 +77,7 @@ const TaskListScreen: React.FC<TaskListScreenProps> = ({ tasksHook }) => {
 
   return (
     <div className="space-y-4 animate-slide-in-up pb-24">
-      {motivationalQuote && (
+      {settings.showMotivation && motivationalQuote && (
         <div className="bg-white dark:bg-dark-surface p-4 rounded-lg shadow-md text-center italic text-gray-600 dark:text-gray-300">
           <p>"{motivationalQuote}"</p>
         </div>

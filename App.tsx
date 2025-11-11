@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import HomeScreen from './components/HomeScreen';
 import TaskListScreen from './components/TaskListScreen';
@@ -45,7 +44,6 @@ const App: React.FC = () => {
     if (sharedData) {
       try {
         const binaryString = atob(sharedData);
-        // FIX: Corrected typo from UintArray to Uint8Array.
         const bytes = new Uint8Array(binaryString.length);
         for (let i = 0; i < binaryString.length; i++) {
           bytes[i] = binaryString.charCodeAt(i);

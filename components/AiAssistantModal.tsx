@@ -48,43 +48,37 @@ const AiAssistantModal: React.FC<AiAssistantModalProps> = ({ isOpen, onClose, ad
     }
   };
   
+  const initializeChat = () => {
+    try {
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+        
+        const historyForGenAI = chatHistory.map(msg => ({
+            role: msg.role,
+            parts: [{ text: msg.text }]
+        }));
+
+        chatRef.current = ai.chats.create({
+          model: 'gemini-2.5-flash',
+          history: historyForGenAI,
+          config: {
+            systemInstruction: systemInstruction,
+            tools: [{ functionDeclarations: [addTaskFunctionDeclaration] }],
+          }
+        });
+
+        if (chatHistory.length === 0) {
+          setChatHistory([{ role: 'model', text: "Olá! Sou o Kirpo, seu assistente de rotina. Como posso te ajudar a organizar seu dia?" }]);
+        }
+        setError('');
+    } catch (e) {
+        console.error("Failed to initialize Gemini Chat", e);
+        setError("Não foi possível iniciar o assistente. Tente novamente mais tarde.");
+    }
+  }
+
   useEffect(() => {
     if (isOpen) {
-        if (!process.env.API_KEY) {
-            setError("A chave da API Gemini não está configurada. Não é possível usar o assistente.");
-            return;
-        }
-        try {
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-            
-            const historyForGenAI = chatHistory.map(msg => ({
-                role: msg.role,
-                parts: [{ text: msg.text }]
-            }));
-
-            chatRef.current = ai.chats.create({
-              model: 'gemini-2.5-flash',
-              history: historyForGenAI,
-              config: {
-                systemInstruction: systemInstruction,
-                tools: [{ functionDeclarations: [addTaskFunctionDeclaration] }],
-              }
-            });
-
-            if (chatHistory.length === 0) {
-              setChatHistory([{ role: 'model', text: "Olá! Sou o Kirpo, seu assistente de rotina. Como posso te ajudar a organizar seu dia?" }]);
-            }
-
-        } catch (e) {
-            console.error("Failed to initialize Gemini Chat", e);
-            setError("Não foi possível iniciar o assistente de IA.");
-        }
-    } else {
-        // Cleanup on close
-        chatRef.current = null;
-        setPrompt('');
-        setError('');
-        setIsLoading(false);
+       initializeChat();
     }
   }, [isOpen]);
   
@@ -135,7 +129,14 @@ const AiAssistantModal: React.FC<AiAssistantModalProps> = ({ isOpen, onClose, ad
                     });
                 }
             }
-            response = await chatRef.current.sendMessage({ message: functionResponseParts });
+            
+            if (functionResponseParts.length > 0) {
+              response = await chatRef.current.sendMessage({ message: functionResponseParts });
+            } else {
+              // If there are function calls but we didn't handle any, break the loop
+              // to avoid an infinite loop.
+              break;
+            }
         }
         
         const modelResponse: ChatMessage = { role: 'model', text: response.text };
@@ -168,7 +169,7 @@ const AiAssistantModal: React.FC<AiAssistantModalProps> = ({ isOpen, onClose, ad
             <XMarkIcon className="w-6 h-6" />
           </button>
         </div>
-
+        
         <div ref={chatContainerRef} className="flex-grow p-4 space-y-4 overflow-y-auto">
             {chatHistory.map((msg, index) => (
                 <div key={index} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
@@ -213,7 +214,6 @@ const AiAssistantModal: React.FC<AiAssistantModalProps> = ({ isOpen, onClose, ad
                 </button>
             </form>
         </div>
-
       </div>
     </div>
   );

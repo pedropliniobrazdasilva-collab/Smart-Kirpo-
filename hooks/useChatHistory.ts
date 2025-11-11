@@ -22,7 +22,10 @@ export const useChatHistory = () => {
 
   useEffect(() => {
     try {
-      localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(chatHistory));
+      // Don't save if it's just the initial message
+      if (chatHistory.length > 1 || (chatHistory.length === 1 && chatHistory[0].role !== 'model')) {
+        localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(chatHistory));
+      }
     } catch (error)      {
       console.error("Failed to save chat history to localStorage", error);
     }

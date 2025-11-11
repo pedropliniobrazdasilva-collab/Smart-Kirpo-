@@ -24,7 +24,9 @@ export const useSettings = () => {
     try {
       const storedSettings = localStorage.getItem(SETTINGS_KEY);
       if (storedSettings) {
-        return { ...defaultSettings, ...JSON.parse(storedSettings) };
+        // Merge stored settings with defaults to ensure all keys are present
+        const parsedSettings = JSON.parse(storedSettings);
+        return { ...defaultSettings, ...parsedSettings };
       }
     } catch (error) {
       console.error("Failed to load settings from localStorage", error);
@@ -47,5 +49,5 @@ export const useSettings = () => {
     }));
   }, []);
 
-  return { settings, setSettings, updateSetting, defaultSettings };
+  return { settings, setSettings, updateSetting };
 };

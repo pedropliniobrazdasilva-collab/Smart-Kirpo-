@@ -1,12 +1,8 @@
-
 import { GoogleGenAI } from "@google/genai";
 
 const fetchMotivationalQuote = async (): Promise<string> => {
   try {
-    if (!process.env.API_KEY) {
-      return "Para ter um negócio de sucesso, alguém, algum dia, teve que tomar uma atitude de coragem. - Peter Drucker";
-    }
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: "Me dê uma frase motivacional curta e inspiradora em português para começar o dia bem. Apenas a frase, sem aspas ou introduções.",

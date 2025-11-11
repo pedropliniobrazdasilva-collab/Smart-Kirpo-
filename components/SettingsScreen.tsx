@@ -17,10 +17,13 @@ const SettingsCard: React.FC<{ title: string; children: React.ReactNode }> = ({ 
   </div>
 );
 
-const SettingsRow: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
-  <div className="flex justify-between items-center">
-    <label className="text-gray-700 dark:text-gray-300">{label}</label>
-    <div>{children}</div>
+const SettingsRow: React.FC<{ label: string; children: React.ReactNode; description?: string }> = ({ label, children, description }) => (
+  <div>
+    <div className="flex justify-between items-center">
+        <label className="text-gray-700 dark:text-gray-300">{label}</label>
+        <div>{children}</div>
+    </div>
+    {description && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{description}</p>}
   </div>
 );
 
@@ -36,16 +39,21 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, updateSetting
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleExport = () => {
-        const dataStr = JSON.stringify({ tasks: tasksHook.tasks, settings });
-        const dataBlob = new Blob([dataStr], { type: 'application/json' });
-        const url = URL.createObjectURL(dataBlob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `smart-kirpo-backup-${new Date().toISOString().split('T')[0]}.json`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
+        try {
+            const dataStr = JSON.stringify({ tasks: tasksHook.tasks, settings }, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(dataBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `smart-kirpo-backup-${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error("Failed to export data", error);
+            alert("Não foi possível exportar seus dados.");
+        }
     };
 
     const handleImportClick = () => {
@@ -63,16 +71,28 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, updateSetting
             if (typeof result === 'string') {
                 const data = JSON.parse(result);
                 if (data.tasks && Array.isArray(data.tasks)) {
-                    tasksHook.setTasks(data.tasks);
+                    // Basic validation for tasks
+                    if (data.tasks.every((t: any) => t.id && t.title)) {
+                        tasksHook.setTasks(data.tasks);
+                    }
                 }
                 if(data.settings) {
-                    setSettings(data.settings);
+                    // Don't overwrite with invalid settings
+                    if (typeof data.settings === 'object' && data.settings !== null) {
+                        setSettings(data.settings);
+                    }
                 }
-                alert('Dados importados com sucesso!');
+                alert('Dados importados com sucesso! A página será recarregada.');
+                setTimeout(() => window.location.reload(), 1000);
             }
         } catch (error) {
             console.error('Falha ao importar dados:', error);
             alert('Arquivo de backup inválido.');
+        } finally {
+            // Reset file input
+            if(fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
         }
         };
         reader.readAsText(file);
@@ -82,12 +102,13 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, updateSetting
         if (window.confirm('Você tem certeza que deseja apagar TODOS os dados (tarefas e configurações)? Esta ação não pode ser desfeita.')) {
             localStorage.removeItem('tasks');
             localStorage.removeItem('smart-kirpo-settings');
+            localStorage.removeItem('smart-kirpo-chat-history');
             window.location.reload();
         }
     };
 
   return (
-    <div className="space-y-6 animate-slide-in-up max-w-2xl mx-auto">
+    <div className="space-y-6 animate-slide-in-up max-w-2xl mx-auto pb-8">
       <h2 className="text-2xl font-bold">Configurações</h2>
       
       {/* Aparência */}
@@ -98,39 +119,48 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, updateSetting
          <SettingsRow label="Cor Principal">
             <div className="flex gap-2">
                 {(['orange', 'blue', 'green'] as PrimaryColor[]).map(color => (
-                    <button key={color} onClick={() => updateSetting('primaryColor', color)} className={`w-8 h-8 rounded-full bg-brand-${color} ring-2 ${settings.primaryColor === color ? 'ring-offset-2 ring-offset-gray-100 dark:ring-offset-dark-bg ring-[var(--brand-color)]' : 'ring-transparent'}`}></button>
+                    <button key={color} onClick={() => updateSetting('primaryColor', color)} className={`w-8 h-8 rounded-full bg-brand-${color} ring-2 transition-all ${settings.primaryColor === color ? 'ring-offset-2 ring-offset-gray-100 dark:ring-offset-dark-bg ring-[var(--brand-color)]' : 'ring-transparent hover:ring-gray-300'}`}></button>
                 ))}
             </div>
         </SettingsRow>
         <SettingsRow label="Tamanho do Texto">
-             <select value={settings.fontSize} onChange={e => updateSetting('fontSize', e.target.value as FontSize)} className="bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-md p-1">
+             <select value={settings.fontSize} onChange={e => updateSetting('fontSize', e.target.value as FontSize)} className="bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-md p-1 focus:ring-[var(--brand-color)] focus:border-[var(--brand-color)]">
                 <option value="small">Pequeno</option>
                 <option value="medium">Médio</option>
                 <option value="large">Grande</option>
             </select>
         </SettingsRow>
-        <SettingsRow label="Layout (em breve)">
+        <SettingsRow label="Layout da Lista de Tarefas">
              <select disabled value={settings.layout} onChange={e => updateSetting('layout', e.target.value as Layout)} className="bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-md p-1 disabled:opacity-50">
-                <option value="list">Lista Simples</option>
-                <option value="blocks">Blocos Visuais</option>
+                <option value="list">Lista (Padrão)</option>
+                <option value="blocks">Blocos (Em breve)</option>
             </select>
         </SettingsRow>
+      </SettingsCard>
+
+      <SettingsCard title="💡 Funcionalidades">
         <SettingsRow label="Ativar lembretes (notificações)">
             <SettingsToggle checked={settings.enableNotifications} onChange={v => updateSetting('enableNotifications', v)} />
+        </SettingsRow>
+        <SettingsRow 
+            label="Mostrar frase motivacional"
+            description="Usa a API Gemini para buscar uma nova frase a cada dia."
+        >
+            <SettingsToggle checked={settings.showMotivation} onChange={v => updateSetting('showMotivation', v)} />
         </SettingsRow>
       </SettingsCard>
       
       {/* Privacidade e Dados */}
-      <SettingsCard title="🔒 Privacidade e dados">
-         <SettingsRow label="Backup">
+      <SettingsCard title="🔒 Privacidade e Dados">
+         <SettingsRow label="Backup dos Dados">
             <div className='flex gap-2'>
-                <button onClick={handleExport} className="text-sm py-1 px-3 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 rounded-md font-medium">Exportar</button>
+                <button onClick={handleExport} className="text-sm py-1 px-3 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover-bg-gray-500 rounded-md font-medium">Exportar</button>
                 <button onClick={handleImportClick} className="text-sm py-1 px-3 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 rounded-md font-medium">Importar</button>
                 <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".json" className="hidden" />
             </div>
         </SettingsRow>
-         <SettingsRow label="Limpar dados do app">
-            <button onClick={handleClearData} className="text-sm py-1 px-3 bg-red-500/20 text-red-500 hover:bg-red-500/30 rounded-md font-medium">Limpar</button>
+         <SettingsRow label="Limpar todos os dados">
+            <button onClick={handleClearData} className="text-sm py-1 px-3 bg-red-500/20 text-red-500 hover:bg-red-500/30 rounded-md font-medium">Limpar App</button>
         </SettingsRow>
       </SettingsCard>
 
