@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { GoogleGenAI, Type, Chat, FunctionDeclaration, Part } from "@google/genai";
+import { GoogleGenAI, Type, FunctionDeclaration, Part, Content } from "@google/genai";
 import { marked } from 'marked';
 import { Priority, Task } from '../types';
 import { XMarkIcon, SparklesIcon } from './icons';
@@ -17,7 +17,6 @@ const AiAssistantModal: React.FC<AiAssistantModalProps> = ({ isOpen, onClose, ad
   const [error, setError] = useState('');
   const [isUnavailable, setIsUnavailable] = useState(false);
   const { chatHistory, setChatHistory } = useChatHistory();
-  const chatRef = useRef<Chat | null>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
   const systemInstruction = `Você é o Kirpo, um assistente de IA amigável e proativo para o aplicativo de rotina diária 'Smart Kirpo'. Sua principal função é ajudar os usuários a organizar seu dia e criar tarefas.
@@ -49,45 +48,18 @@ const AiAssistantModal: React.FC<AiAssistantModalProps> = ({ isOpen, onClose, ad
     }
   };
   
-  const initializeChat = useCallback(() => {
-    try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-        
-        const historyForGenAI = chatHistory.map(msg => ({
-            role: msg.role,
-            parts: [{ text: msg.text }]
-        }));
-
-        chatRef.current = ai.chats.create({
-          model: 'gemini-2.5-flash',
-          history: historyForGenAI,
-          config: {
-            systemInstruction: systemInstruction,
-            tools: [{ functionDeclarations: [addTaskFunctionDeclaration] }],
-          }
-        });
-
-        if (chatHistory.length === 0) {
-          setChatHistory([{ role: 'model', text: "Olá! Sou o Kirpo, seu assistente de rotina. Como posso te ajudar a organizar seu dia?" }]);
-        }
-        setError('');
-    } catch (e) {
-        console.error("Failed to initialize Gemini Chat", e);
-        setError("Não foi possível iniciar o assistente. Tente novamente mais tarde.");
-        setIsUnavailable(true);
-    }
-  }, [chatHistory, setChatHistory]);
-
   useEffect(() => {
     if (isOpen) {
       if (!process.env.API_KEY) {
         setIsUnavailable(true);
       } else {
         setIsUnavailable(false);
-        initializeChat();
+        if (chatHistory.length === 0) {
+          setChatHistory([{ role: 'model', text: "Olá! Sou o Kirpo, seu assistente de rotina. Como posso te ajudar a organizar seu dia?" }]);
+        }
       }
     }
-  }, [isOpen, initializeChat]);
+  }, [isOpen, chatHistory.length, setChatHistory]);
   
   useEffect(() => {
     // Auto-scroll to bottom of chat
@@ -97,17 +69,37 @@ const AiAssistantModal: React.FC<AiAssistantModalProps> = ({ isOpen, onClose, ad
   }, [chatHistory]);
 
   const handleSendMessage = async () => {
-    if (!prompt.trim() || isLoading || !chatRef.current) return;
+    if (!prompt.trim() || isLoading) return;
 
     const userMessage: ChatMessage = { role: 'user', text: prompt };
-    setChatHistory(prev => [...prev, userMessage]);
+    const currentFullHistory = [...chatHistory, userMessage];
+    setChatHistory(currentFullHistory);
+    
     const currentPrompt = prompt;
     setPrompt('');
     setIsLoading(true);
     setError('');
 
     try {
-        let response = await chatRef.current.sendMessage({ message: currentPrompt });
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+        
+        const convertHistoryForApi = (history: ChatMessage[]): Content[] => {
+            return history.map(msg => ({
+                role: msg.role,
+                parts: [{ text: msg.text }]
+            }));
+        };
+        
+        let historyForApi = convertHistoryForApi(currentFullHistory);
+
+        let response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: historyForApi,
+            config: {
+                systemInstruction,
+                tools: [{ functionDeclarations: [addTaskFunctionDeclaration] }],
+            }
+        });
         
         while (response.functionCalls) {
             const functionCalls = response.functionCalls;
@@ -138,7 +130,16 @@ const AiAssistantModal: React.FC<AiAssistantModalProps> = ({ isOpen, onClose, ad
             }
             
             if (functionResponseParts.length > 0) {
-              response = await chatRef.current.sendMessage({ message: functionResponseParts });
+                historyForApi.push({ role: 'model', parts: response.candidates[0].content.parts });
+                historyForApi.push({ role: 'user', parts: functionResponseParts });
+                response = await ai.models.generateContent({ 
+                    model: 'gemini-2.5-flash',
+                    contents: historyForApi, 
+                    config: {
+                        systemInstruction,
+                        tools: [{ functionDeclarations: [addTaskFunctionDeclaration] }],
+                    }
+                });
             } else {
               break;
             }
