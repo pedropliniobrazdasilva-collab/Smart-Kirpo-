@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { GoogleGenAI, Type, Chat, FunctionDeclaration, Part } from "@google/genai";
 import { marked } from 'marked';
 import { Priority, Task } from '../types';
@@ -15,6 +15,7 @@ const AiAssistantModal: React.FC<AiAssistantModalProps> = ({ isOpen, onClose, ad
   const [prompt, setPrompt] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [isUnavailable, setIsUnavailable] = useState(false);
   const { chatHistory, setChatHistory } = useChatHistory();
   const chatRef = useRef<Chat | null>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -48,7 +49,7 @@ const AiAssistantModal: React.FC<AiAssistantModalProps> = ({ isOpen, onClose, ad
     }
   };
   
-  const initializeChat = () => {
+  const initializeChat = useCallback(() => {
     try {
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
         
@@ -73,14 +74,20 @@ const AiAssistantModal: React.FC<AiAssistantModalProps> = ({ isOpen, onClose, ad
     } catch (e) {
         console.error("Failed to initialize Gemini Chat", e);
         setError("Não foi possível iniciar o assistente. Tente novamente mais tarde.");
+        setIsUnavailable(true);
     }
-  }
+  }, [chatHistory, setChatHistory]);
 
   useEffect(() => {
     if (isOpen) {
-       initializeChat();
+      if (!process.env.API_KEY) {
+        setIsUnavailable(true);
+      } else {
+        setIsUnavailable(false);
+        initializeChat();
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, initializeChat]);
   
   useEffect(() => {
     // Auto-scroll to bottom of chat
@@ -133,8 +140,6 @@ const AiAssistantModal: React.FC<AiAssistantModalProps> = ({ isOpen, onClose, ad
             if (functionResponseParts.length > 0) {
               response = await chatRef.current.sendMessage({ message: functionResponseParts });
             } else {
-              // If there are function calls but we didn't handle any, break the loop
-              // to avoid an infinite loop.
               break;
             }
         }
@@ -145,7 +150,7 @@ const AiAssistantModal: React.FC<AiAssistantModalProps> = ({ isOpen, onClose, ad
     } catch (e) {
         console.error("Error sending message to Gemini:", e);
         setError("Ocorreu um erro na comunicação com a IA. Tente novamente.");
-        setChatHistory(prev => prev.filter(msg => msg !== userMessage)); // remove user message on error
+        setChatHistory(prev => prev.filter(msg => msg !== userMessage));
     } finally {
         setIsLoading(false);
     }
@@ -171,28 +176,39 @@ const AiAssistantModal: React.FC<AiAssistantModalProps> = ({ isOpen, onClose, ad
         </div>
         
         <div ref={chatContainerRef} className="flex-grow p-4 space-y-4 overflow-y-auto">
-            {chatHistory.map((msg, index) => (
-                <div key={index} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`p-3 rounded-2xl max-w-[85%] ${msg.role === 'user' ? 'bg-[var(--brand-color)] text-white rounded-br-none' : 'bg-gray-200 dark:bg-gray-700 rounded-bl-none'}`}>
-                        {msg.role === 'model' ? (
-                            <div 
-                                className="text-sm chat-content"
-                                dangerouslySetInnerHTML={{ __html: marked.parse(msg.text, { gfm: true, breaks: true }) as string }}
-                            />
-                        ) : (
-                            <p className="text-sm">{msg.text}</p>
-                        )}
-                    </div>
+            {isUnavailable ? (
+               <div className="p-3 rounded-2xl bg-gray-200 dark:bg-gray-700 rounded-bl-none">
+                    <div 
+                        className="text-sm chat-content"
+                        dangerouslySetInnerHTML={{ __html: marked.parse("Sinto muito, mas o **assistente de IA não está disponível**. A chave da API do Google Gemini não foi configurada neste ambiente. Por favor, contate o administrador do site para ativá-lo.", { gfm: true, breaks: true }) as string }}
+                    />
                 </div>
-            ))}
-            {isLoading && (
-                <div className="flex justify-start">
-                    <div className="p-3 rounded-2xl bg-gray-200 dark:bg-gray-700 rounded-bl-none">
-                        <p className="text-sm italic text-gray-500 dark:text-gray-400">Kirpo está digitando...</p>
-                    </div>
-                </div>
+            ) : (
+                <>
+                    {chatHistory.map((msg, index) => (
+                        <div key={index} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                            <div className={`p-3 rounded-2xl max-w-[85%] ${msg.role === 'user' ? 'bg-[var(--brand-color)] text-white rounded-br-none' : 'bg-gray-200 dark:bg-gray-700 rounded-bl-none'}`}>
+                                {msg.role === 'model' ? (
+                                    <div 
+                                        className="text-sm chat-content"
+                                        dangerouslySetInnerHTML={{ __html: marked.parse(msg.text, { gfm: true, breaks: true }) as string }}
+                                    />
+                                ) : (
+                                    <p className="text-sm">{msg.text}</p>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                    {isLoading && (
+                        <div className="flex justify-start">
+                            <div className="p-3 rounded-2xl bg-gray-200 dark:bg-gray-700 rounded-bl-none">
+                                <p className="text-sm italic text-gray-500 dark:text-gray-400">Kirpo está digitando...</p>
+                            </div>
+                        </div>
+                    )}
+                    {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+                </>
             )}
-            {error && <p className="text-red-500 text-sm text-center">{error}</p>}
         </div>
 
         <div className="p-4 border-t border-gray-200 dark:border-gray-700">
@@ -201,13 +217,13 @@ const AiAssistantModal: React.FC<AiAssistantModalProps> = ({ isOpen, onClose, ad
                 type="text"
                 value={prompt}
                 onChange={e => setPrompt(e.target.value)}
-                placeholder="Converse com o Kirpo..."
-                disabled={isLoading}
-                className="flex-grow bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-full shadow-sm focus:ring-[var(--brand-color)] focus:border-[var(--brand-color)] px-4"
+                placeholder={isUnavailable ? "Assistente indisponível" : "Converse com o Kirpo..."}
+                disabled={isLoading || isUnavailable}
+                className="flex-grow bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-full shadow-sm focus:ring-[var(--brand-color)] focus:border-[var(--brand-color)] px-4 disabled:opacity-50"
                 />
                 <button
                 type="submit"
-                disabled={isLoading || !prompt.trim()}
+                disabled={isLoading || !prompt.trim() || isUnavailable}
                 className="py-2 px-4 bg-[var(--brand-color)] hover:opacity-90 text-white rounded-full font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                 Enviar
