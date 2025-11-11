@@ -100,3 +100,19 @@ export const Cog6ToothIcon: React.FC<IconProps> = ({ className }) => (
         <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
     </svg>
 );
+
+export const AcademicCapIcon: React.FC<IconProps> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+        <path d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+        <path d="M4.5 6.75L12 3m0 0l7.5 3.75M12 3v9" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        <path d="M6.375 12c0-1.036.726-1.9.166-2.457a4.5 4.5 0 01-2.041-.856M17.625 12c0-1.036-.726-1.9-.166-2.457a4.5 4.5 0 002.041-.856" />
+        <path d="M12 21a9.003 9.003 0 008.354-5.646" />
+    </svg>
+);
+
+export const BriefcaseIcon: React.FC<IconProps> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 14.15v4.098a2.25 2.25 0 01-2.25 2.25h-13.5a2.25 2.25 0 01-2.25-2.25V14.15M12 12.375v4.5m0-4.5H5.625m6.375 0H18.375m-12.75 0L12 12.375m0 0L18.375 9.75M12 12.375L5.625 9.75m6.375 2.625v4.5m-6.375-4.5v-4.5L12 3m0 0l6.375 2.25m-6.375-2.25v4.5m6.375 4.5L12 9.75" />
+    </svg>
+);

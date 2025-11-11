@@ -102,7 +102,6 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, updateSetting
         if (window.confirm('Você tem certeza que deseja apagar TODOS os dados (tarefas e configurações)? Esta ação não pode ser desfeita.')) {
             localStorage.removeItem('tasks');
             localStorage.removeItem('smart-kirpo-settings');
-            localStorage.removeItem('smart-kirpo-chat-history');
             window.location.reload();
         }
     };

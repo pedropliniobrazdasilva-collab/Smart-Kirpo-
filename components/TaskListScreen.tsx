@@ -3,7 +3,7 @@ import { useTasks } from '../hooks/useTasks';
 import { Task, Priority } from '../types';
 import TaskItem from './TaskItem';
 import TaskFormModal from './TaskFormModal';
-import AiAssistantModal from './AiAssistantModal';
+import RoutineGeneratorModal from './RoutineGeneratorModal'; // Novo componente
 import { PlusIcon, SparklesIcon } from './icons';
 import fetchMotivationalQuote from '../services/geminiService';
 import { useSettings } from '../hooks/useSettings';
@@ -18,7 +18,7 @@ const TaskListScreen: React.FC<TaskListScreenProps> = ({ tasksHook }) => {
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [taskToEdit, setTaskToEdit] = useState<Task | null>(null);
-  const [isAiModalOpen, setIsAiModalOpen] = useState(false);
+  const [isRoutineModalOpen, setIsRoutineModalOpen] = useState(false); // Novo estado
   const [motivationalQuote, setMotivationalQuote] = useState('');
 
   useEffect(() => {
@@ -39,6 +39,11 @@ const TaskListScreen: React.FC<TaskListScreenProps> = ({ tasksHook }) => {
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setTaskToEdit(null);
+  };
+  
+  const handleAddRoutine = (routineTasks: Omit<Task, 'id' | 'completed' | 'createdAt'>[]) => {
+    routineTasks.forEach(task => addTask(task));
+    setIsRoutineModalOpen(false);
   };
 
   const handleSaveTask = (taskData: Omit<Task, 'id' | 'completed' | 'createdAt' | 'completedAt'>) => {
@@ -120,10 +125,10 @@ const TaskListScreen: React.FC<TaskListScreenProps> = ({ tasksHook }) => {
 
       <div className="fixed bottom-6 right-6 flex flex-col items-center gap-3 z-30">
         <button
-          onClick={() => setIsAiModalOpen(true)}
+          onClick={() => setIsRoutineModalOpen(true)}
           style={{ backgroundColor: 'var(--brand-color)'}}
           className="w-14 h-14 rounded-full text-white flex items-center justify-center shadow-lg hover:opacity-90 transition-opacity"
-          aria-label="Assistente IA"
+          aria-label="Gerador de Rotinas"
         >
           <SparklesIcon className="w-7 h-7" />
         </button>
@@ -144,10 +149,10 @@ const TaskListScreen: React.FC<TaskListScreenProps> = ({ tasksHook }) => {
         taskToEdit={taskToEdit}
       />
       
-      <AiAssistantModal
-        isOpen={isAiModalOpen}
-        onClose={() => setIsAiModalOpen(false)}
-        addTask={addTask}
+      <RoutineGeneratorModal
+        isOpen={isRoutineModalOpen}
+        onClose={() => setIsRoutineModalOpen(false)}
+        onAddRoutine={handleAddRoutine}
       />
     </div>
   );
