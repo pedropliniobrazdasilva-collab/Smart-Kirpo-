@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { GoogleGenAI, Type, FunctionDeclaration, Part, Content } from "@google/genai";
+import React, { useState, useEffect, useRef } from 'react';
+import type { Part, Content } from "@google/genai";
 import { marked } from 'marked';
 import { Priority, Task } from '../types';
 import { XMarkIcon, SparklesIcon } from './icons';
@@ -15,93 +15,59 @@ const AiAssistantModal: React.FC<AiAssistantModalProps> = ({ isOpen, onClose, ad
   const [prompt, setPrompt] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [isUnavailable, setIsUnavailable] = useState(false);
   const { chatHistory, setChatHistory } = useChatHistory();
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
-  const systemInstruction = `Você é o Kirpo, um assistente de IA amigável e proativo para o aplicativo de rotina diária 'Smart Kirpo'. Sua principal função é ajudar os usuários a organizar seu dia e criar tarefas.
-- Seja conversador e prestativo.
-- Formate suas respostas usando Markdown para melhor legibilidade. Use títulos (#), listas (- ou *), **negrito** e *itálico* para organizar a informação.
-- Quando um usuário pedir para criar uma rotina ou uma lista de tarefas, primeiro descreva o propósito e os benefícios dessa rotina de forma encorajadora.
-- Depois de descrever, pergunte explicitamente ao usuário se ele deseja adicionar as tarefas à sua lista e para quais dias da semana.
-- NUNCA adicione tarefas sem a confirmação do usuário.
-- Use a função 'add_task_to_list' para adicionar CADA tarefa individualmente, somente após a confirmação.
-- Após adicionar as tarefas com sucesso, confirme para o usuário que as tarefas foram adicionadas.
-- Responda sempre em português do Brasil.`;
-
-  const addTaskFunctionDeclaration: FunctionDeclaration = {
-    name: 'add_task_to_list',
-    description: 'Adiciona uma nova tarefa à lista de tarefas do usuário.',
-    parameters: {
-      type: Type.OBJECT,
-      properties: {
-        title: { type: Type.STRING, description: 'O título da tarefa.' },
-        time: { type: Type.STRING, description: 'A hora para a tarefa no formato HH:mm. Opcional.' },
-        priority: { type: Type.STRING, description: `A prioridade: '${Priority.Low}', '${Priority.Medium}', ou '${Priority.High}'.` },
-        repeatDays: {
-          type: Type.ARRAY,
-          description: 'Uma lista de dias para repetir a tarefa (0=Domingo, 1=Segunda, etc.).',
-          items: { type: Type.NUMBER }
-        }
-      },
-      required: ['title', 'priority', 'repeatDays']
-    }
-  };
-  
   useEffect(() => {
     if (isOpen) {
-      if (!process.env.API_KEY) {
-        setIsUnavailable(true);
-      } else {
-        setIsUnavailable(false);
-        if (chatHistory.length === 0) {
-          setChatHistory([{ role: 'model', text: "Olá! Sou o Kirpo, seu assistente de rotina. Como posso te ajudar a organizar seu dia?" }]);
-        }
+      if (chatHistory.length === 0) {
+        setChatHistory([{ role: 'model', text: "Olá! Sou o Kirpo, seu assistente de rotina. Como posso te ajudar a organizar seu dia?" }]);
       }
     }
   }, [isOpen, chatHistory.length, setChatHistory]);
   
   useEffect(() => {
-    // Auto-scroll to bottom of chat
     if (chatContainerRef.current) {
         chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
-  }, [chatHistory]);
+  }, [chatHistory, isLoading, error]);
+
+  const callGeminiProxy = async (history: Content[]) => {
+    const response = await fetch('/api/gemini', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'chat', payload: { history } }),
+    });
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Proxy request failed');
+    }
+    return response.json();
+  };
 
   const handleSendMessage = async () => {
     if (!prompt.trim() || isLoading) return;
 
     const userMessage: ChatMessage = { role: 'user', text: prompt };
-    const currentFullHistory = [...chatHistory, userMessage];
-    setChatHistory(currentFullHistory);
+    setChatHistory(prev => [...prev, userMessage]);
     
-    const currentPrompt = prompt;
     setPrompt('');
     setIsLoading(true);
     setError('');
 
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-        
         const convertHistoryForApi = (history: ChatMessage[]): Content[] => {
             return history.map(msg => ({
-                role: msg.role,
+                role: msg.role as 'user' | 'model',
                 parts: [{ text: msg.text }]
             }));
         };
         
-        let historyForApi = convertHistoryForApi(currentFullHistory);
+        let historyForApi = convertHistoryForApi([...chatHistory, userMessage]);
 
-        let response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: historyForApi,
-            config: {
-                systemInstruction,
-                tools: [{ functionDeclarations: [addTaskFunctionDeclaration] }],
-            }
-        });
+        let response = await callGeminiProxy(historyForApi);
         
-        while (response.functionCalls) {
+        while (response.functionCalls && response.functionCalls.length > 0) {
             const functionCalls = response.functionCalls;
             const functionResponseParts: Part[] = [];
 
@@ -132,14 +98,7 @@ const AiAssistantModal: React.FC<AiAssistantModalProps> = ({ isOpen, onClose, ad
             if (functionResponseParts.length > 0) {
                 historyForApi.push({ role: 'model', parts: response.candidates[0].content.parts });
                 historyForApi.push({ role: 'user', parts: functionResponseParts });
-                response = await ai.models.generateContent({ 
-                    model: 'gemini-2.5-flash',
-                    contents: historyForApi, 
-                    config: {
-                        systemInstruction,
-                        tools: [{ functionDeclarations: [addTaskFunctionDeclaration] }],
-                    }
-                });
+                response = await callGeminiProxy(historyForApi);
             } else {
               break;
             }
@@ -149,9 +108,13 @@ const AiAssistantModal: React.FC<AiAssistantModalProps> = ({ isOpen, onClose, ad
         setChatHistory(prev => [...prev, modelResponse]);
 
     } catch (e) {
-        console.error("Error sending message to Gemini:", e);
-        setError("Ocorreu um erro na comunicação com a IA. Tente novamente.");
-        setChatHistory(prev => prev.filter(msg => msg !== userMessage));
+        console.error("Error sending message to Gemini via proxy:", e);
+        if (e instanceof Error && e.message.includes("API key is not configured")) {
+             setError("Desculpe, o assistente de IA não está disponível no momento.");
+        } else {
+             setError("Ocorreu um erro na comunicação com a IA. Tente novamente.");
+        }
+        setChatHistory(prev => prev.slice(0, -1)); // Remove the user's message that failed
     } finally {
         setIsLoading(false);
     }
@@ -162,6 +125,8 @@ const AiAssistantModal: React.FC<AiAssistantModalProps> = ({ isOpen, onClose, ad
   };
 
   if (!isOpen) return null;
+
+  const isEffectivelyUnavailable = error.includes("não está disponível");
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 animate-fade-in" onClick={handleClose}>
@@ -177,39 +142,28 @@ const AiAssistantModal: React.FC<AiAssistantModalProps> = ({ isOpen, onClose, ad
         </div>
         
         <div ref={chatContainerRef} className="flex-grow p-4 space-y-4 overflow-y-auto">
-            {isUnavailable ? (
-               <div className="p-3 rounded-2xl bg-gray-200 dark:bg-gray-700 rounded-bl-none">
-                    <div 
-                        className="text-sm chat-content"
-                        dangerouslySetInnerHTML={{ __html: marked.parse("Sinto muito, mas o **assistente de IA não está disponível**. A chave da API do Google Gemini não foi configurada neste ambiente. Por favor, contate o administrador do site para ativá-lo.", { gfm: true, breaks: true }) as string }}
-                    />
+            {chatHistory.map((msg, index) => (
+                <div key={index} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`p-3 rounded-2xl max-w-[85%] ${msg.role === 'user' ? 'bg-[var(--brand-color)] text-white rounded-br-none' : 'bg-gray-200 dark:bg-gray-700 rounded-bl-none'}`}>
+                        {msg.role === 'model' ? (
+                            <div 
+                                className="text-sm chat-content"
+                                dangerouslySetInnerHTML={{ __html: marked.parse(msg.text, { gfm: true, breaks: true }) as string }}
+                            />
+                        ) : (
+                            <p className="text-sm">{msg.text}</p>
+                        )}
+                    </div>
                 </div>
-            ) : (
-                <>
-                    {chatHistory.map((msg, index) => (
-                        <div key={index} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                            <div className={`p-3 rounded-2xl max-w-[85%] ${msg.role === 'user' ? 'bg-[var(--brand-color)] text-white rounded-br-none' : 'bg-gray-200 dark:bg-gray-700 rounded-bl-none'}`}>
-                                {msg.role === 'model' ? (
-                                    <div 
-                                        className="text-sm chat-content"
-                                        dangerouslySetInnerHTML={{ __html: marked.parse(msg.text, { gfm: true, breaks: true }) as string }}
-                                    />
-                                ) : (
-                                    <p className="text-sm">{msg.text}</p>
-                                )}
-                            </div>
-                        </div>
-                    ))}
-                    {isLoading && (
-                        <div className="flex justify-start">
-                            <div className="p-3 rounded-2xl bg-gray-200 dark:bg-gray-700 rounded-bl-none">
-                                <p className="text-sm italic text-gray-500 dark:text-gray-400">Kirpo está digitando...</p>
-                            </div>
-                        </div>
-                    )}
-                    {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-                </>
+            ))}
+            {isLoading && (
+                <div className="flex justify-start">
+                    <div className="p-3 rounded-2xl bg-gray-200 dark:bg-gray-700 rounded-bl-none">
+                        <p className="text-sm italic text-gray-500 dark:text-gray-400">Kirpo está digitando...</p>
+                    </div>
+                </div>
             )}
+            {error && <p className="text-red-500 text-sm text-center">{error}</p>}
         </div>
 
         <div className="p-4 border-t border-gray-200 dark:border-gray-700">
@@ -218,13 +172,13 @@ const AiAssistantModal: React.FC<AiAssistantModalProps> = ({ isOpen, onClose, ad
                 type="text"
                 value={prompt}
                 onChange={e => setPrompt(e.target.value)}
-                placeholder={isUnavailable ? "Assistente indisponível" : "Converse com o Kirpo..."}
-                disabled={isLoading || isUnavailable}
+                placeholder={isEffectivelyUnavailable ? "Assistente indisponível" : "Converse com o Kirpo..."}
+                disabled={isLoading || isEffectivelyUnavailable}
                 className="flex-grow bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-full shadow-sm focus:ring-[var(--brand-color)] focus:border-[var(--brand-color)] px-4 disabled:opacity-50"
                 />
                 <button
                 type="submit"
-                disabled={isLoading || !prompt.trim() || isUnavailable}
+                disabled={isLoading || !prompt.trim() || isEffectivelyUnavailable}
                 className="py-2 px-4 bg-[var(--brand-color)] hover:opacity-90 text-white rounded-full font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                 Enviar

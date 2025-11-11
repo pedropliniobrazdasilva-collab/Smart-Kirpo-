@@ -1,21 +1,27 @@
-import { GoogleGenAI } from "@google/genai";
 
 const fallbackQuote = "Acredite em você mesmo e em tudo que você é. Saiba que existe algo dentro de você que é maior que qualquer obstáculo.";
 
 const fetchMotivationalQuote = async (): Promise<string> => {
-  if (!process.env.API_KEY) {
-    console.warn("Gemini API key is missing. Returning a fallback quote.");
-    return fallbackQuote;
-  }
-
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: "Me dê uma frase motivacional curta e inspiradora em português para começar o dia bem. Apenas a frase, sem aspas ou introduções.",
+    const response = await fetch('/api/gemini', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ type: 'quote' }),
     });
+
+    if (!response.ok) {
+      console.error("Error fetching motivational quote from proxy:", response.statusText);
+      return fallbackQuote;
+    }
     
-    return response.text.trim();
+    const data = await response.json();
+    if (data.text) {
+        return data.text.trim();
+    }
+    return fallbackQuote;
+
   } catch (error) {
     console.error("Error fetching motivational quote:", error);
     return fallbackQuote;
