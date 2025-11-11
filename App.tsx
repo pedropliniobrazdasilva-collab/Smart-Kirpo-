@@ -1,14 +1,16 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+
+import React, { useState, useEffect, useRef } from 'react';
 import HomeScreen from './components/HomeScreen';
 import TaskListScreen from './components/TaskListScreen';
 import DashboardScreen from './components/DashboardScreen';
+import SettingsScreen from './components/SettingsScreen';
 import Header from './components/Header';
 import SharedTaskListScreen from './components/SharedTaskListScreen';
 import { useTasks } from './hooks/useTasks';
+import { useSettings } from './hooks/useSettings';
 import { Task } from './types';
 
-export type Screen = 'home' | 'tasks' | 'dashboard';
-export type Theme = 'light' | 'dark';
+export type Screen = 'home' | 'tasks' | 'dashboard' | 'settings';
 
 const Toast: React.FC<{ message: string; onDismiss: () => void }> = ({ message, onDismiss }) => {
   useEffect(() => {
@@ -25,10 +27,7 @@ const Toast: React.FC<{ message: string; onDismiss: () => void }> = ({ message, 
 
 
 const App: React.FC = () => {
-  const [theme, setTheme] = useState<Theme>(() => {
-    return (localStorage.getItem('theme') as Theme) || 'dark';
-  });
-  
+  const { settings, updateSetting, setSettings } = useSettings();
   const [notificationPermission, setNotificationPermission] = useState(Notification.permission);
   const notifiedTasks = useRef(new Set<string>());
 
@@ -45,8 +44,8 @@ const App: React.FC = () => {
 
     if (sharedData) {
       try {
-        // Robust base64 to UTF-8 decoding
         const binaryString = atob(sharedData);
+        // FIX: Corrected typo from UintArray to Uint8Array.
         const bytes = new Uint8Array(binaryString.length);
         for (let i = 0; i < binaryString.length; i++) {
           bytes[i] = binaryString.charCodeAt(i);
@@ -67,17 +66,30 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const root = window.document.documentElement;
-    if (theme === 'dark') {
+    // Theme
+    if (settings.theme === 'dark') {
       root.classList.add('dark');
     } else {
       root.classList.remove('dark');
     }
-    localStorage.setItem('theme', theme);
-  }, [theme]);
+    // Font Size
+    root.classList.remove('text-sm', 'text-base', 'text-lg');
+    const fontSizeMap = { small: 'text-sm', medium: 'text-base', large: 'text-lg' };
+    root.classList.add(fontSizeMap[settings.fontSize]);
+
+    // Primary Color
+    const colorMap = {
+        orange: '#FF7A00',
+        blue: '#3B82F6',
+        green: '#22C55E',
+    };
+    root.style.setProperty('--brand-color', colorMap[settings.primaryColor]);
+
+  }, [settings.theme, settings.fontSize, settings.primaryColor]);
 
   // Notification scheduler effect
   useEffect(() => {
-    if (notificationPermission !== 'granted') return;
+    if (notificationPermission !== 'granted' || !settings.enableNotifications) return;
 
     const interval = setInterval(() => {
       const now = new Date();
@@ -92,7 +104,6 @@ const App: React.FC = () => {
           const timeDiff = taskTime.getTime() - now.getTime();
           const minutesUntil = Math.ceil(timeDiff / (1000 * 60));
 
-          // On-start notification (triggers from 0 to -1 minute to catch it)
           if (minutesUntil <= 0 && minutesUntil > -2) {
              const notificationKey = `start-${task.id}-${todayStr}`;
              if(!notifiedTasks.current.has(notificationKey)) {
@@ -105,7 +116,6 @@ const App: React.FC = () => {
              }
           }
 
-          // Pre-task notification (15 mins before)
           const approachingNotificationKey = `approaching-${task.id}-${todayStr}`;
           if (minutesUntil > 0 && minutesUntil <= 15 && !notifiedTasks.current.has(approachingNotificationKey)) {
              new Notification(`Tarefa Próxima: ${task.title}`, {
@@ -118,24 +128,22 @@ const App: React.FC = () => {
         }
       });
 
-      // Clean up old notification keys at midnight
       if (now.getHours() === 0 && now.getMinutes() === 0) {
         notifiedTasks.current.clear();
       }
 
-    }, 60000); // Check every minute
+    }, 60000);
 
     return () => clearInterval(interval);
 
-  }, [tasksHook.tasks, notificationPermission]);
-
-  const toggleTheme = () => {
-    setTheme(prevTheme => (prevTheme === 'light' ? 'dark' : 'light'));
-  };
+  }, [tasksHook.tasks, notificationPermission, settings.enableNotifications]);
   
   const requestNotificationPermission = async () => {
     const permission = await Notification.requestPermission();
     setNotificationPermission(permission);
+    if (permission === 'granted') {
+      updateSetting('enableNotifications', true);
+    }
   };
   
   const showToast = (message: string) => {
@@ -151,7 +159,6 @@ const App: React.FC = () => {
     try {
         const tasksJson = JSON.stringify(tasksHook.tasks);
         
-        // Robust UTF-8 to base64 encoding
         const utf8Bytes = new TextEncoder().encode(tasksJson);
         let binaryString = '';
         utf8Bytes.forEach((byte) => {
@@ -177,21 +184,7 @@ const App: React.FC = () => {
     }
   };
 
-  const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(err => {
-        // Optional: Show a user-friendly message
-        console.error(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
-      });
-    } else {
-      if (document.exitFullscreen) {
-        document.exitFullscreen();
-      }
-    }
-  };
-  
   const handleStart = () => {
-    toggleFullscreen();
     setScreen('tasks');
   }
 
@@ -203,6 +196,8 @@ const App: React.FC = () => {
         return <TaskListScreen tasksHook={tasksHook} />;
       case 'dashboard':
         return <DashboardScreen tasks={tasksHook.tasks} />;
+      case 'settings':
+        return <SettingsScreen settings={settings} updateSetting={updateSetting} tasksHook={tasksHook} setSettings={setSettings}/>;
       default:
         return <HomeScreen onStart={handleStart} />;
     }
@@ -212,22 +207,21 @@ const App: React.FC = () => {
     return <SharedTaskListScreen tasks={sharedTasks} />;
   }
 
-
   return (
-    <div className={`relative min-h-screen ${theme === 'dark' ? 'bg-dark-bg' : 'bg-gray-100'} text-gray-900 dark:text-gray-100 transition-colors duration-500`}>
+    <div className={`relative min-h-screen ${settings.theme === 'dark' ? 'bg-dark-bg' : 'bg-gray-100'} text-gray-900 dark:text-gray-100 transition-colors duration-500`}>
       
       {screen !== 'home' && (
         <Header 
           activeScreen={screen} 
           setScreen={setScreen} 
-          theme={theme}
-          toggleTheme={toggleTheme}
+          theme={settings.theme}
+          toggleTheme={() => updateSetting('theme', settings.theme === 'light' ? 'dark' : 'light')}
           onShare={handleShare}
         />
       )}
       
       {screen !== 'home' && notificationPermission === 'default' && (
-        <div className="bg-brand-orange/20 dark:bg-brand-light/20 text-brand-dark dark:text-brand-light p-3 text-center text-sm">
+        <div className="bg-[var(--brand-color)]/20 text-[var(--brand-color)] p-3 text-center text-sm">
           Para receber lembretes de tarefas,{' '}
           <button onClick={requestNotificationPermission} className="font-bold underline hover:opacity-80">
             ative as notificações

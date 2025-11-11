@@ -31,7 +31,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ tasks }) => {
 
   const StatCard: React.FC<{ title: string; value: string | number }> = ({ title, value }) => (
     <div className="bg-white dark:bg-dark-surface p-4 rounded-lg shadow-md flex flex-col items-center justify-center">
-      <span className="text-3xl font-bold text-brand-orange">{value}</span>
+      <span className="text-3xl font-bold text-[var(--brand-color)]">{value}</span>
       <p className="text-sm text-gray-500 dark:text-gray-400">{title}</p>
     </div>
   );
@@ -53,7 +53,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ tasks }) => {
                 <div key={index} className="flex-1 flex flex-col items-center">
                     <div className="w-full h-full flex items-end">
                         <div 
-                            className="w-full bg-brand-orange rounded-t-md hover:bg-brand-light transition-colors"
+                            className="w-full bg-[var(--brand-color)] rounded-t-md hover:opacity-80 transition-opacity"
                             style={{ height: `${(chartData.data[index] / maxTasks) * 100}%` }}
                             title={`${chartData.data[index]} tarefas`}
                         ></div>

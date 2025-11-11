@@ -1,19 +1,37 @@
-
 import { useState, useEffect, useCallback } from 'react';
-import { Task, Priority, Repeat } from '../types';
+import { Task, Priority } from '../types';
 
 export const useTasks = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
 
   useEffect(() => {
+    let loadedTasks: Task[] = [];
     try {
       const storedTasks = localStorage.getItem('tasks');
       if (storedTasks) {
-        setTasks(JSON.parse(storedTasks));
+        loadedTasks = JSON.parse(storedTasks);
       }
-    } catch (error) {
+    } catch (error)
+      {
       console.error("Failed to load tasks from localStorage", error);
     }
+
+    const lastVisit = localStorage.getItem('lastVisitDate');
+    const today = new Date().toISOString().split('T')[0];
+    
+    if (lastVisit !== today) {
+        loadedTasks = loadedTasks.map(task => {
+          const isRecurring = task.repeatDays && task.repeatDays.length > 0;
+          if (isRecurring && task.completed) {
+            return { ...task, completed: false, completedAt: undefined };
+          }
+          return task;
+        });
+        localStorage.setItem('lastVisitDate', today);
+    }
+    
+    setTasks(loadedTasks);
+
   }, []);
 
   useEffect(() => {

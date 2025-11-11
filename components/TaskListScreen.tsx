@@ -1,9 +1,12 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTasks } from '../hooks/useTasks';
-import { Task } from '../types';
+import { Task, Priority } from '../types';
 import TaskItem from './TaskItem';
 import TaskFormModal from './TaskFormModal';
-import { PlusIcon } from './icons';
+import AiAssistantModal from './AiAssistantModal';
+import { PlusIcon, SparklesIcon } from './icons';
+import fetchMotivationalQuote from '../services/geminiService';
+import { useSettings } from '../hooks/useSettings';
 
 interface TaskListScreenProps {
   tasksHook: ReturnType<typeof useTasks>;
@@ -11,45 +14,79 @@ interface TaskListScreenProps {
 
 const TaskListScreen: React.FC<TaskListScreenProps> = ({ tasksHook }) => {
   const { tasks, addTask, updateTask, deleteTask, toggleTaskCompletion } = tasksHook;
+  const { settings } = useSettings();
+  
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [taskToEdit, setTaskToEdit] = useState<Task | null>(null);
+  const [isAiModalOpen, setIsAiModalOpen] = useState(false);
+  const [motivationalQuote, setMotivationalQuote] = useState('');
+
+  useEffect(() => {
+    if (settings.showMotivation) {
+        const getQuote = async () => {
+            const quote = await fetchMotivationalQuote();
+            setMotivationalQuote(quote);
+        };
+        getQuote();
+    }
+  }, [settings.showMotivation]);
 
   const handleOpenModal = (task?: Task) => {
-    setEditingTask(task || null);
+    setTaskToEdit(task || null);
     setIsModalOpen(true);
   };
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
-    setEditingTask(null);
+    setTaskToEdit(null);
   };
 
   const handleSaveTask = (taskData: Omit<Task, 'id' | 'completed' | 'createdAt' | 'completedAt'>) => {
-    if (editingTask) {
-      updateTask({ ...editingTask, ...taskData });
+    if (taskToEdit) {
+      updateTask({ ...taskToEdit, ...taskData });
     } else {
-      addTask(taskData as Omit<Task, 'id' | 'completed' | 'createdAt'>);
+      addTask(taskData);
     }
     handleCloseModal();
   };
-
-  const sortedTasks = useMemo(() => {
-    return [...tasks].sort((a, b) => {
-      if (a.completed !== b.completed) {
-        return a.completed ? 1 : -1;
+  
+  const sortedTasks = [...tasks].sort((a, b) => {
+    if (a.completed !== b.completed) {
+      return a.completed ? 1 : -1;
+    }
+    // Sort by time first for incomplete tasks
+    if (!a.completed && !b.completed) {
+      if (a.time && !b.time) return -1;
+      if (!a.time && b.time) return 1;
+      if (a.time && b.time) {
+        if (a.time !== b.time) {
+          return a.time.localeCompare(b.time);
+        }
       }
-      const priorityOrder = { high: 0, medium: 1, low: 2 };
+    }
+    // Then sort by priority
+    const priorityOrder = { [Priority.High]: 0, [Priority.Medium]: 1, [Priority.Low]: 2 };
+    if (a.priority !== b.priority) {
       return priorityOrder[a.priority] - priorityOrder[b.priority];
-    });
-  }, [tasks]);
+    }
+    return 0;
+  });
+  
+  const incompleteTasks = sortedTasks.filter(t => !t.completed);
+  const completedTasks = sortedTasks.filter(t => t.completed);
 
   return (
-    <div className="animate-slide-in-up">
-      <h2 className="text-2xl font-bold mb-4">Minhas Tarefas</h2>
+    <div className="space-y-4 animate-slide-in-up pb-24">
+      {motivationalQuote && (
+        <div className="bg-white dark:bg-dark-surface p-4 rounded-lg shadow-md text-center italic text-gray-600 dark:text-gray-300">
+          <p>"{motivationalQuote}"</p>
+        </div>
+      )}
+      
       <div className="space-y-3">
-        {sortedTasks.length > 0 ? (
-          sortedTasks.map(task => (
-            <TaskItem
+        {incompleteTasks.length > 0 ? (
+          incompleteTasks.map(task => (
+            <TaskItem 
               key={task.id}
               task={task}
               onToggle={toggleTaskCompletion}
@@ -59,25 +96,58 @@ const TaskListScreen: React.FC<TaskListScreenProps> = ({ tasksHook }) => {
           ))
         ) : (
           <div className="text-center py-10 px-4 bg-white dark:bg-dark-surface rounded-lg">
-            <p className="text-gray-500 dark:text-gray-400">Você não tem tarefas ainda.</p>
-            <p className="text-gray-400 dark:text-gray-500 text-sm">Clique no botão '+' para adicionar sua primeira tarefa!</p>
+            <p className="text-gray-500 dark:text-gray-400">Tudo limpo! Adicione uma nova tarefa para começar.</p>
           </div>
         )}
       </div>
 
-      <button
-        onClick={() => handleOpenModal()}
-        aria-label="Adicionar nova tarefa"
-        className="fixed bottom-6 right-6 bg-brand-orange hover:bg-brand-light text-white rounded-full p-4 shadow-lg transform hover:scale-110 transition-all duration-300"
-      >
-        <PlusIcon className="w-8 h-8" />
-      </button>
+      {completedTasks.length > 0 && (
+        <div>
+          <h3 className="text-lg font-semibold my-4 text-gray-500 dark:text-gray-400">Concluídas</h3>
+          <div className="space-y-3">
+            {completedTasks.map(task => (
+              <TaskItem 
+                key={task.id}
+                task={task}
+                onToggle={toggleTaskCompletion}
+                onDelete={deleteTask}
+                onEdit={() => handleOpenModal(task)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
-      <TaskFormModal
+      <div className="fixed bottom-6 right-6 flex flex-col items-center gap-3 z-30">
+        <button
+          onClick={() => setIsAiModalOpen(true)}
+          style={{ backgroundColor: 'var(--brand-color)'}}
+          className="w-14 h-14 rounded-full text-white flex items-center justify-center shadow-lg hover:opacity-90 transition-opacity"
+          aria-label="Assistente IA"
+        >
+          <SparklesIcon className="w-7 h-7" />
+        </button>
+        <button
+          onClick={() => handleOpenModal()}
+          style={{ backgroundColor: 'var(--brand-color)'}}
+          className="w-16 h-16 rounded-full text-white flex items-center justify-center shadow-lg hover:opacity-90 transition-opacity"
+          aria-label="Adicionar nova tarefa"
+        >
+          <PlusIcon className="w-8 h-8" />
+        </button>
+      </div>
+
+      <TaskFormModal 
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         onSave={handleSaveTask}
-        taskToEdit={editingTask}
+        taskToEdit={taskToEdit}
+      />
+      
+      <AiAssistantModal
+        isOpen={isAiModalOpen}
+        onClose={() => setIsAiModalOpen(false)}
+        addTask={addTask}
       />
     </div>
   );

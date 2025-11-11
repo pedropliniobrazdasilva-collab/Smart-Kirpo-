@@ -20,12 +20,15 @@ const SharedTaskListScreen: React.FC<SharedTaskListScreenProps> = ({ tasks }) =>
     window.location.href = window.location.origin + window.location.pathname;
   }
 
+  // Shared screen will always use the default orange color
+  const brandColor = '#FF7A00';
+
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-dark-bg text-gray-900 dark:text-gray-100 p-4 md:p-6 animate-fade-in">
+    <div className="min-h-screen bg-gray-100 dark:bg-dark-bg text-gray-900 dark:text-gray-100 p-4 md:p-6 animate-fade-in" style={{'--brand-color': brandColor} as React.CSSProperties}>
         <header className="text-center mb-6">
             <div className="flex items-center justify-center gap-3">
-                <RocketIcon className="w-8 h-8 text-brand-orange"/>
-                <h1 className="text-3xl font-bold text-brand-orange">Smart Kirpo</h1>
+                <RocketIcon className="w-8 h-8" style={{ color: brandColor }}/>
+                <h1 className="text-3xl font-bold" style={{ color: brandColor }}>Smart Kirpo</h1>
             </div>
             <p className="text-lg mt-2 text-gray-600 dark:text-gray-400">Visualizando uma rotina compartilhada</p>
         </header>
@@ -53,7 +56,12 @@ const SharedTaskListScreen: React.FC<SharedTaskListScreenProps> = ({ tasks }) =>
             <div className="mt-8 text-center">
                 <button
                 onClick={goToMainApp}
-                className="bg-brand-orange hover:bg-brand-dark text-white font-bold py-3 px-6 rounded-full shadow-lg shadow-brand-dark/40 transition-colors duration-300 focus:outline-none focus:ring-4 focus:ring-brand-light/50"
+                className="text-white font-bold py-3 px-6 rounded-full shadow-lg transition-colors duration-300 focus:outline-none focus:ring-4"
+                style={{ 
+                    backgroundColor: brandColor,
+                    boxShadow: `0 4px 14px 0 rgba(255, 122, 0, 0.39)`,
+                    '--tw-ring-color': 'rgba(255, 153, 51, 0.5)'
+                }}
                 >
                 Crie sua própria rotina
                 </button>

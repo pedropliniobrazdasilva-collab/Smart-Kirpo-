@@ -14,7 +14,7 @@ const StarryBackground: React.FC = () => {
       size: `${Math.random() * 2 + 1}px`,
       delay: `${Math.random() * 5}s`,
       duration: `${Math.random() * 5 + 5}s`,
-      twinkles: Math.random() > 0.7, // Apenas algumas estrelas vão piscar
+      twinkles: Math.random() > 0.7,
     }));
   }, []);
 
@@ -47,14 +47,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onStart }) => {
       <StarryBackground />
 
       <div className="relative z-10 flex flex-col items-center">
-        <RocketIcon className="w-12 h-12 mb-4 text-brand-orange" />
+        <RocketIcon className="w-12 h-12 mb-4 text-[var(--brand-color)]" />
         <h1 className="text-6xl md:text-7xl font-bold text-white tracking-wider">
           Smart Kirpo
         </h1>
         
         <div className="h-16 mt-4 flex flex-col items-center justify-center">
             <div 
-              className="overflow-hidden whitespace-nowrap border-r-4 border-r-brand-orange text-lg text-gray-200 animate-typewriter"
+              className="overflow-hidden whitespace-nowrap border-r-4 border-r-[var(--brand-color)] text-lg text-gray-200 animate-typewriter"
             >
               {motivationalPhrase}
             </div>
@@ -62,7 +62,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onStart }) => {
 
         <button
           onClick={onStart}
-          className="mt-12 w-full max-w-xs mx-auto bg-brand-orange hover:bg-brand-dark text-white font-bold py-4 px-8 rounded-full shadow-lg shadow-brand-dark/40 transition-colors duration-300 focus:outline-none focus:ring-4 focus:ring-brand-light/50"
+          style={{ 
+             backgroundColor: 'var(--brand-color)',
+             boxShadow: `0 4px 14px 0 rgba(var(--brand-color-rgb), 0.39)`
+          }}
+          className="mt-12 w-full max-w-xs mx-auto text-white font-bold py-4 px-8 rounded-full transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-[var(--brand-color)]/50 hover:opacity-90"
         >
           Começar o Dia
         </button>

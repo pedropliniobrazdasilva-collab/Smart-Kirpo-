@@ -19,6 +19,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onToggle, onDelete, onEdit, i
   
   const formatRepeatDays = (days?: number[]): string => {
       if (!days || days.length === 0) return '';
+      if (days.length === 7) return 'Diariamente';
       const dayNames = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
       return days.sort((a,b) => a-b).map(d => dayNames[d]).join(', ');
   };
@@ -32,7 +33,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onToggle, onDelete, onEdit, i
         onClick={() => !isReadOnly && onToggle(task.id)}
         disabled={isReadOnly}
         aria-label={task.completed ? 'Marcar como não concluída' : 'Marcar como concluída'}
-        className={`w-7 h-7 min-w-[28px] rounded-full border-2 flex items-center justify-center mr-4 transition-colors ${task.completed ? 'bg-brand-orange border-brand-orange' : 'border-gray-300 dark:border-gray-500'} ${isReadOnly ? 'cursor-not-allowed' : ''}`}
+        className={`w-7 h-7 min-w-[28px] rounded-full border-2 flex items-center justify-center mr-4 transition-colors ${task.completed ? 'bg-[var(--brand-color)] border-[var(--brand-color)]' : 'border-gray-300 dark:border-gray-500'} ${isReadOnly ? 'cursor-not-allowed' : ''}`}
       >
         {task.completed && <CheckIcon className="w-4 h-4 text-white" />}
       </button>
@@ -45,8 +46,8 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onToggle, onDelete, onEdit, i
             {task.time && (
               <span className="text-xs text-gray-500 dark:text-gray-400">{task.time}</span>
             )}
-            {task.repeat === 'weekly' && task.repeatDays && task.repeatDays.length > 0 && (
-              <span className="text-xs text-brand-orange font-semibold">
+            {task.repeatDays && task.repeatDays.length > 0 && (
+              <span className="text-xs text-[var(--brand-color)] font-semibold">
                 {formatRepeatDays(task.repeatDays)}
               </span>
             )}
