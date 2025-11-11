@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useTasks } from '../hooks/useTasks';
 import { Settings, PrimaryColor, FontSize, Layout } from '../types';
 
@@ -37,6 +37,45 @@ const SettingsToggle: React.FC<{ checked: boolean; onChange: (checked: boolean) 
 
 const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, updateSetting, tasksHook, setSettings }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [pinInput, setPinInput] = useState('');
+    const [pinError, setPinError] = useState('');
+
+    useEffect(() => {
+        // Reset pin input when toggling off
+        if (!settings.usePin) {
+            setPinInput('');
+            setPinError('');
+        }
+    }, [settings.usePin]);
+
+    const handlePinChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value.replace(/[^0-9]/g, ''); // Only allow numbers
+        if (value.length <= 6) {
+            setPinInput(value);
+            if (pinError) setPinError('');
+        }
+    };
+
+    const handleSetPin = () => {
+        if (pinInput.length < 4) {
+            setPinError('O PIN deve ter entre 4 e 6 dígitos.');
+            return;
+        }
+        updateSetting('pin', pinInput);
+        alert('PIN definido com sucesso!');
+        setPinInput('');
+    };
+    
+    const handleTogglePin = (checked: boolean) => {
+        if (checked) {
+            // If turning on without a pin set, force setting one.
+             updateSetting('usePin', true);
+        } else {
+            // Turning off
+            updateSetting('usePin', false);
+            updateSetting('pin', null);
+        }
+    }
 
     const handleExport = () => {
         try {
@@ -151,6 +190,31 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, updateSetting
       
       {/* Privacidade e Dados */}
       <SettingsCard title="🔒 Privacidade e Dados">
+        <SettingsRow label="Bloqueio por PIN" description="Proteja seu app com um PIN numérico.">
+            <SettingsToggle checked={settings.usePin} onChange={handleTogglePin} />
+        </SettingsRow>
+        {settings.usePin && (
+            <div className="pl-4 border-l-2 border-gray-200 dark:border-gray-700">
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {settings.pin ? "PIN está definido." : "Defina um PIN de 4-6 dígitos."}
+                </p>
+                <div className="flex items-center gap-2 mt-2">
+                    <input 
+                        type="password"
+                        inputMode="numeric"
+                        value={pinInput}
+                        onChange={handlePinChange}
+                        maxLength={6}
+                        className="bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-md p-1 w-32 focus:ring-[var(--brand-color)] focus:border-[var(--brand-color)]"
+                        placeholder={settings.pin ? "Novo PIN" : "Definir PIN"}
+                    />
+                    <button onClick={handleSetPin} className="text-sm py-1 px-3 bg-[var(--brand-color)] text-white hover:opacity-90 rounded-md font-medium">
+                        {settings.pin ? "Alterar" : "Salvar"}
+                    </button>
+                </div>
+                {pinError && <p className="text-red-500 text-xs mt-1">{pinError}</p>}
+            </div>
+        )}
          <SettingsRow label="Backup dos Dados">
             <div className='flex gap-2'>
                 <button onClick={handleExport} className="text-sm py-1 px-3 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover-bg-gray-500 rounded-md font-medium">Exportar</button>

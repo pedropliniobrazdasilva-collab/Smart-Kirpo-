@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useTasks } from '../hooks/useTasks';
 import { Task, Priority } from '../types';
 import TaskItem from './TaskItem';
 import TaskFormModal from './TaskFormModal';
-import RoutineGeneratorModal from './RoutineGeneratorModal'; // Novo componente
+import AiAssistantModal from './AiAssistantModal';
 import { PlusIcon, SparklesIcon } from './icons';
 import fetchMotivationalQuote from '../services/geminiService';
 import { useSettings } from '../hooks/useSettings';
@@ -13,13 +13,15 @@ interface TaskListScreenProps {
 }
 
 const TaskListScreen: React.FC<TaskListScreenProps> = ({ tasksHook }) => {
-  const { tasks, addTask, updateTask, deleteTask, toggleTaskCompletion } = tasksHook;
+  const { tasks, setTasks, addTask, updateTask, deleteTask, toggleTaskCompletion } = tasksHook;
   const { settings } = useSettings();
   
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isFormModalOpen, setIsFormModalOpen] = useState(false);
+  const [isAiModalOpen, setIsAiModalOpen] = useState(false);
   const [taskToEdit, setTaskToEdit] = useState<Task | null>(null);
-  const [isRoutineModalOpen, setIsRoutineModalOpen] = useState(false); // Novo estado
   const [motivationalQuote, setMotivationalQuote] = useState('');
+  const dragTask = useRef<string | null>(null);
+  const dragOverTask = useRef<string | null>(null);
 
   useEffect(() => {
     if (settings.showMotivation) {
@@ -31,19 +33,14 @@ const TaskListScreen: React.FC<TaskListScreenProps> = ({ tasksHook }) => {
     }
   }, [settings.showMotivation]);
 
-  const handleOpenModal = (task?: Task) => {
+  const handleOpenFormModal = (task?: Task) => {
     setTaskToEdit(task || null);
-    setIsModalOpen(true);
+    setIsFormModalOpen(true);
   };
 
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
+  const handleCloseFormModal = () => {
+    setIsFormModalOpen(false);
     setTaskToEdit(null);
-  };
-  
-  const handleAddRoutine = (routineTasks: Omit<Task, 'id' | 'completed' | 'createdAt'>[]) => {
-    routineTasks.forEach(task => addTask(task));
-    setIsRoutineModalOpen(false);
   };
 
   const handleSaveTask = (taskData: Omit<Task, 'id' | 'completed' | 'createdAt' | 'completedAt'>) => {
@@ -52,14 +49,36 @@ const TaskListScreen: React.FC<TaskListScreenProps> = ({ tasksHook }) => {
     } else {
       addTask(taskData);
     }
-    handleCloseModal();
+    handleCloseFormModal();
+  };
+  
+  const handleDragSort = () => {
+    if (dragTask.current === null || dragOverTask.current === null) return;
+    
+    const tasksClone = [...tasks];
+    const draggedTask = tasksClone.find(t => t.id === dragTask.current);
+    if (!draggedTask) return;
+
+    // Remove the dragged task from its original position
+    const filteredTasks = tasksClone.filter(t => t.id !== dragTask.current);
+
+    // Find the index of the task we dragged over
+    const dragOverIndex = filteredTasks.findIndex(t => t.id === dragOverTask.current);
+    
+    // Insert the dragged task at the new position
+    filteredTasks.splice(dragOverIndex, 0, draggedTask);
+
+    setTasks(filteredTasks);
+    
+    dragTask.current = null;
+    dragOverTask.current = null;
   };
   
   const sortedTasks = [...tasks].sort((a, b) => {
     if (a.completed !== b.completed) {
       return a.completed ? 1 : -1;
     }
-    // Sort by time first for incomplete tasks
+    // For incomplete tasks, if not manually sorted, sort by time and then priority
     if (!a.completed && !b.completed) {
       if (a.time && !b.time) return -1;
       if (!a.time && b.time) return 1;
@@ -68,17 +87,16 @@ const TaskListScreen: React.FC<TaskListScreenProps> = ({ tasksHook }) => {
           return a.time.localeCompare(b.time);
         }
       }
+      const priorityOrder = { [Priority.High]: 0, [Priority.Medium]: 1, [Priority.Low]: 2 };
+      if (a.priority !== b.priority) {
+        return priorityOrder[a.priority] - priorityOrder[b.priority];
+      }
     }
-    // Then sort by priority
-    const priorityOrder = { [Priority.High]: 0, [Priority.Medium]: 1, [Priority.Low]: 2 };
-    if (a.priority !== b.priority) {
-      return priorityOrder[a.priority] - priorityOrder[b.priority];
-    }
-    return 0;
+    return 0; // Keep original order if priorities are the same, or for completed tasks
   });
   
-  const incompleteTasks = sortedTasks.filter(t => !t.completed);
-  const completedTasks = sortedTasks.filter(t => t.completed);
+  const incompleteTasks = tasks.filter(t => !t.completed);
+  const completedTasks = tasks.filter(t => t.completed);
 
   return (
     <div className="space-y-4 animate-slide-in-up pb-24">
@@ -96,7 +114,10 @@ const TaskListScreen: React.FC<TaskListScreenProps> = ({ tasksHook }) => {
               task={task}
               onToggle={toggleTaskCompletion}
               onDelete={deleteTask}
-              onEdit={() => handleOpenModal(task)}
+              onEdit={() => handleOpenFormModal(task)}
+              onDragStart={(e) => { dragTask.current = task.id; e.dataTransfer.effectAllowed = 'move'; }}
+              onDragEnter={() => dragOverTask.current = task.id}
+              onDragEnd={handleDragSort}
             />
           ))
         ) : (
@@ -116,24 +137,24 @@ const TaskListScreen: React.FC<TaskListScreenProps> = ({ tasksHook }) => {
                 task={task}
                 onToggle={toggleTaskCompletion}
                 onDelete={deleteTask}
-                onEdit={() => handleOpenModal(task)}
+                onEdit={() => handleOpenFormModal(task)}
               />
             ))}
           </div>
         </div>
       )}
 
-      <div className="fixed bottom-6 right-6 flex flex-col items-center gap-3 z-30">
+      <div className="fixed bottom-6 right-6 z-30 flex flex-col gap-3">
         <button
-          onClick={() => setIsRoutineModalOpen(true)}
+          onClick={() => setIsAiModalOpen(true)}
           style={{ backgroundColor: 'var(--brand-color)'}}
-          className="w-14 h-14 rounded-full text-white flex items-center justify-center shadow-lg hover:opacity-90 transition-opacity"
-          aria-label="Gerador de Rotinas"
+          className="w-14 h-14 rounded-full text-white flex items-center justify-center shadow-lg hover:opacity-90 transition-all duration-300"
+          aria-label="Assistente de IA Kirpo"
         >
           <SparklesIcon className="w-7 h-7" />
         </button>
         <button
-          onClick={() => handleOpenModal()}
+          onClick={() => handleOpenFormModal()}
           style={{ backgroundColor: 'var(--brand-color)'}}
           className="w-16 h-16 rounded-full text-white flex items-center justify-center shadow-lg hover:opacity-90 transition-opacity"
           aria-label="Adicionar nova tarefa"
@@ -143,17 +164,18 @@ const TaskListScreen: React.FC<TaskListScreenProps> = ({ tasksHook }) => {
       </div>
 
       <TaskFormModal 
-        isOpen={isModalOpen}
-        onClose={handleCloseModal}
+        isOpen={isFormModalOpen}
+        onClose={handleCloseFormModal}
         onSave={handleSaveTask}
         taskToEdit={taskToEdit}
       />
       
-      <RoutineGeneratorModal
-        isOpen={isRoutineModalOpen}
-        onClose={() => setIsRoutineModalOpen(false)}
-        onAddRoutine={handleAddRoutine}
+      <AiAssistantModal 
+        isOpen={isAiModalOpen}
+        onClose={() => setIsAiModalOpen(false)}
+        addTask={addTask}
       />
+      
     </div>
   );
 };

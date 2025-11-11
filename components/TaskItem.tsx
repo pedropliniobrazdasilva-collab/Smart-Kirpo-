@@ -1,16 +1,19 @@
 import React from 'react';
 import { Task, Priority } from '../types';
-import { TrashIcon, PencilIcon, CheckIcon } from './icons';
+import { TrashIcon, PencilIcon, CheckIcon, ListBulletIcon } from './icons';
 
 interface TaskItemProps {
   task: Task;
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
   onEdit: (task: Task) => void;
+  onDragStart?: (e: React.DragEvent<HTMLDivElement>) => void;
+  onDragEnter?: (e: React.DragEvent<HTMLDivElement>) => void;
+  onDragEnd?: () => void;
   isReadOnly?: boolean;
 }
 
-const TaskItem: React.FC<TaskItemProps> = ({ task, onToggle, onDelete, onEdit, isReadOnly = false }) => {
+const TaskItem: React.FC<TaskItemProps> = ({ task, onToggle, onDelete, onEdit, onDragStart, onDragEnter, onDragEnd, isReadOnly = false }) => {
   const priorityClasses: { [key in Priority]: string } = {
     [Priority.High]: 'border-red-500',
     [Priority.Medium]: 'border-yellow-500',
@@ -24,10 +27,16 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onToggle, onDelete, onEdit, i
       return days.sort((a,b) => a-b).map(d => dayNames[d]).join(', ');
   };
 
+  const isDraggable = !isReadOnly && !task.completed && onDragStart;
 
   return (
     <div
-      className={`flex items-center p-3 bg-white dark:bg-dark-surface rounded-lg shadow-sm border-l-4 ${priorityClasses[task.priority]} transition-all duration-300 ${task.completed ? 'opacity-50' : ''}`}
+      draggable={isDraggable}
+      onDragStart={isDraggable ? onDragStart : undefined}
+      onDragEnter={isDraggable ? onDragEnter : undefined}
+      onDragEnd={isDraggable ? onDragEnd : undefined}
+      onDragOver={isDraggable ? (e) => e.preventDefault() : undefined}
+      className={`flex items-center p-3 bg-white dark:bg-dark-surface rounded-lg shadow-sm border-l-4 ${priorityClasses[task.priority]} transition-all duration-300 ${task.completed ? 'opacity-50' : ''} ${isDraggable ? 'cursor-grab' : ''}`}
     >
       <button
         onClick={() => !isReadOnly && onToggle(task.id)}
@@ -55,13 +64,18 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onToggle, onDelete, onEdit, i
       </div>
 
       {!isReadOnly && (
-        <div className="flex items-center space-x-2 ml-2">
+        <div className="flex items-center space-x-1 ml-2">
           <button onClick={() => onEdit(task)} aria-label="Editar tarefa" className="p-2 text-gray-500 hover:text-blue-500 transition-colors rounded-full hover:bg-gray-200 dark:hover:bg-gray-700">
             <PencilIcon className="w-5 h-5" />
           </button>
           <button onClick={() => onDelete(task.id)} aria-label="Excluir tarefa" className="p-2 text-gray-500 hover:text-red-500 transition-colors rounded-full hover:bg-gray-200 dark:hover:bg-gray-700">
             <TrashIcon className="w-5 h-5" />
           </button>
+          {isDraggable && (
+             <span className="p-2 text-gray-400 dark:text-gray-500 cursor-grab" title="Arraste para reordenar">
+                <ListBulletIcon className="w-5 h-5 transform rotate-90" />
+            </span>
+          )}
         </div>
       )}
     </div>

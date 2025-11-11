@@ -4,26 +4,12 @@ import TaskListScreen from './components/TaskListScreen';
 import DashboardScreen from './components/DashboardScreen';
 import SettingsScreen from './components/SettingsScreen';
 import Header from './components/Header';
-import SharedTaskListScreen from './components/SharedTaskListScreen';
+import PinLockScreen from './components/PinLockScreen';
 import { useTasks } from './hooks/useTasks';
 import { useSettings } from './hooks/useSettings';
 import { Task } from './types';
 
 export type Screen = 'home' | 'tasks' | 'dashboard' | 'settings';
-
-const Toast: React.FC<{ message: string; onDismiss: () => void }> = ({ message, onDismiss }) => {
-  useEffect(() => {
-    const timer = setTimeout(onDismiss, 3000);
-    return () => clearTimeout(timer);
-  }, [onDismiss]);
-
-  return (
-    <div className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-gray-800 text-white py-2 px-4 rounded-lg shadow-lg z-50 animate-fade-in">
-      {message}
-    </div>
-  );
-};
-
 
 const App: React.FC = () => {
   const { settings, updateSetting, setSettings } = useSettings();
@@ -31,36 +17,16 @@ const App: React.FC = () => {
   const notifiedTasks = useRef(new Set<string>());
 
   const [screen, setScreen] = useState<Screen>('home');
+  const [isLocked, setIsLocked] = useState(false);
+  
   const tasksHook = useTasks();
   
-  const [sharedTasks, setSharedTasks] = useState<Task[] | null>(null);
-  const [isShareView, setIsShareView] = useState(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const sharedData = urlParams.get('shared');
-
-    if (sharedData) {
-      try {
-        const binaryString = atob(sharedData);
-        const bytes = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++) {
-          bytes[i] = binaryString.charCodeAt(i);
-        }
-        const decodedJson = new TextDecoder().decode(bytes);
-        
-        const tasks = JSON.parse(decodedJson);
-        if (Array.isArray(tasks)) {
-          setSharedTasks(tasks);
-          setIsShareView(true);
-        }
-      } catch (error) {
-        console.error("Failed to parse shared tasks:", error);
-        window.history.replaceState({}, document.title, window.location.pathname);
-      }
+    // Check for lock screen on initial load
+    if (settings.usePin && settings.pin) {
+      setIsLocked(true);
     }
-  }, []);
+  }, []); // Run only once on mount
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -144,46 +110,12 @@ const App: React.FC = () => {
     }
   };
   
-  const showToast = (message: string) => {
-    setToastMessage(message);
-  };
-
-  const handleShare = async () => {
-    if (tasksHook.tasks.length === 0) {
-      alert("Adicione algumas tarefas antes de compartilhar!");
-      return;
-    }
-
-    try {
-        const tasksJson = JSON.stringify(tasksHook.tasks);
-        
-        const utf8Bytes = new TextEncoder().encode(tasksJson);
-        let binaryString = '';
-        utf8Bytes.forEach((byte) => {
-            binaryString += String.fromCharCode(byte);
-        });
-        const base64Tasks = btoa(binaryString);
-
-        const shareUrl = `${window.location.origin}${window.location.pathname}?shared=${base64Tasks}`;
-
-        if (navigator.share) {
-            await navigator.share({
-                title: 'Minha Rotina Smart Kirpo',
-                text: 'Confira minha rotina diária!',
-                url: shareUrl,
-            });
-        } else {
-            await navigator.clipboard.writeText(shareUrl);
-            showToast("Link copiado para a área de transferência!");
-        }
-    } catch (error) {
-        console.error('Falha ao compartilhar/copiar:', error);
-        alert("Não foi possível gerar o link de compartilhamento.");
-    }
-  };
-
   const handleStart = () => {
     setScreen('tasks');
+  }
+
+  const handleUnlock = () => {
+    setIsLocked(false);
   }
 
   const renderScreen = () => {
@@ -201,37 +133,37 @@ const App: React.FC = () => {
     }
   };
   
-  if (isShareView && sharedTasks) {
-    return <SharedTaskListScreen tasks={sharedTasks} />;
-  }
+  const mainContent = (
+      <>
+          {screen !== 'home' && (
+            <Header 
+              activeScreen={screen} 
+              setScreen={setScreen} 
+              theme={settings.theme}
+              toggleTheme={() => updateSetting('theme', settings.theme === 'light' ? 'dark' : 'light')}
+            />
+          )}
+          
+          {screen !== 'home' && notificationPermission === 'default' && (
+            <div className="bg-[var(--brand-color)]/20 text-[var(--brand-color)] p-3 text-center text-sm">
+              Para receber lembretes de tarefas,{' '}
+              <button onClick={requestNotificationPermission} className="font-bold underline hover:opacity-80">
+                ative as notificações
+              </button>.
+            </div>
+          )}
+          
+          <main className="p-4 md:p-6 relative z-10">
+            {renderScreen()}
+          </main>
+      </>
+  );
 
   return (
     <div className={`relative min-h-screen ${settings.theme === 'dark' ? 'bg-dark-bg' : 'bg-gray-100'} text-gray-900 dark:text-gray-100 transition-colors duration-500`}>
-      
-      {screen !== 'home' && (
-        <Header 
-          activeScreen={screen} 
-          setScreen={setScreen} 
-          theme={settings.theme}
-          toggleTheme={() => updateSetting('theme', settings.theme === 'light' ? 'dark' : 'light')}
-          onShare={handleShare}
-        />
-      )}
-      
-      {screen !== 'home' && notificationPermission === 'default' && (
-        <div className="bg-[var(--brand-color)]/20 text-[var(--brand-color)] p-3 text-center text-sm">
-          Para receber lembretes de tarefas,{' '}
-          <button onClick={requestNotificationPermission} className="font-bold underline hover:opacity-80">
-            ative as notificações
-          </button>.
-        </div>
-      )}
-      
-      <main className="p-4 md:p-6 relative z-10">
-        {renderScreen()}
-      </main>
-      
-      {toastMessage && <Toast message={toastMessage} onDismiss={() => setToastMessage(null)} />}
+      {isLocked ? (
+        <PinLockScreen correctPin={settings.pin!} onUnlock={handleUnlock} />
+      ) : mainContent}
     </div>
   );
 };

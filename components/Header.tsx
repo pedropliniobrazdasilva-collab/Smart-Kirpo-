@@ -1,17 +1,16 @@
 import React from 'react';
 import { Screen } from '../App';
 import { Theme } from '../types';
-import { SunIcon, MoonIcon, ChartBarIcon, ListBulletIcon, ShareIcon, Cog6ToothIcon } from './icons';
+import { SunIcon, MoonIcon, ChartBarIcon, ListBulletIcon, Cog6ToothIcon } from './icons';
 
 interface HeaderProps {
   activeScreen: Screen;
   setScreen: (screen: Screen) => void;
   theme: Theme;
   toggleTheme: () => void;
-  onShare: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ activeScreen, setScreen, theme, toggleTheme, onShare }) => {
+const Header: React.FC<HeaderProps> = ({ activeScreen, setScreen, theme, toggleTheme }) => {
   
   const brandColor = 'var(--brand-color, #FF7A00)';
 
@@ -36,15 +35,6 @@ const Header: React.FC<HeaderProps> = ({ activeScreen, setScreen, theme, toggleT
         <NavButton screen="dashboard" label="Ver painel">
           <ChartBarIcon className="w-6 h-6" />
         </NavButton>
-        {activeScreen === 'tasks' && (
-          <button
-            onClick={onShare}
-            aria-label="Compartilhar tarefas"
-            className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-dark-surface transition-colors duration-300"
-          >
-            <ShareIcon className="w-6 h-6" />
-          </button>
-        )}
         <button
           onClick={toggleTheme}
           aria-label="Alternar tema"
